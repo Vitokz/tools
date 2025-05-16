@@ -1,0 +1,37 @@
+name: Deploy to Coolify and Migrate Database
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: 
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+
+    - name: Install Goose
+      run: |
+        go install github.com/pressly/goose/v3/cmd/goose@latest
+        echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+    - name: Run Database Migrations
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      run: |
+        goose -dir ./migrations postgres "$DATABASE_URL" up
+
+    - name: Deploy to Coolify
+      env:
+        COOLIFY_WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
+        COOLIFY_WEBHOOK_SECRET: ${{ secrets.COOLIFY_WEBHOOK_SECRET }}
+      run: |
+        curl --request GET "$COOLIFY_WEBHOOK_URL" \
+        --header "Authorization: Bearer $COOLIFY_WEBHOOK_SECRET"
